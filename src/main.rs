@@ -1,5 +1,8 @@
 use clap::Parser;
-use rmcp::{ServerHandler, model::*, tool, transport::sse_server::SseServer};
+use rmcp::transport::sse_server::SseServer;
+
+mod db;
+mod mcp_server;
 
 #[derive(Parser, Debug)]
 #[clap(name = "rspostgresmcp", about = "Postgres MCP server")]
@@ -20,31 +23,17 @@ struct Cli {
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
+    // Initialize DB connection
+    let db = db::DB::new(cli.dsn.clone()).await?;
+
+    // Create an MCP instance
+    let mcp = mcp_server::McpServer::new(db);
+
     let ct = SseServer::serve(cli.addr.parse()?)
         .await?
-        .with_service(MCP::new);
+        .with_service(move || mcp.clone());
 
     tokio::signal::ctrl_c().await?;
     ct.cancel();
     Ok(())
-}
-#[derive(Clone)]
-struct MCP {}
-
-#[tool(tool_box)]
-impl MCP {
-    fn new() -> Self {
-        Self {}
-    }
-}
-
-#[tool(tool_box)]
-impl ServerHandler for MCP {
-    fn get_info(&self) -> ServerInfo {
-        ServerInfo {
-            instructions: Some("Postgres MCP server".into()),
-            capabilities: ServerCapabilities::builder().enable_tools().build(),
-            ..Default::default()
-        }
-    }
 }
