@@ -1,5 +1,6 @@
 use clap::Parser;
 use rmcp::transport::sse_server::SseServer;
+use tracing::info;
 
 mod db;
 mod mcp_server;
@@ -10,7 +11,7 @@ struct Cli {
     /// postgres connection string
     #[clap(
         long,
-        default_value = "postgres://postgres:password@localhost:5432/postgres"
+        default_value = "postgres://postgres:postgres@localhost:5432/usda"
     )]
     dsn: String,
 
@@ -21,14 +22,18 @@ struct Cli {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt::init();
     let cli = Cli::parse();
 
     // Initialize DB connection
+    info!("Initializing DB connection");
     let db = db::DB::new(cli.dsn.clone()).await?;
 
     // Create an MCP instance
+    info!("Creating MCP instance");
     let mcp = mcp_server::McpServer::new(db);
 
+    info!("Starting rspostgresmcp server on {}", cli.addr);
     let ct = SseServer::serve(cli.addr.parse()?)
         .await?
         .with_service(move || mcp.clone());
