@@ -1395,6 +1395,7 @@ dependencies = [
  "anyhow",
  "clap",
  "rmcp",
+ "serde_json",
  "sqlx",
  "tokio",
 ]

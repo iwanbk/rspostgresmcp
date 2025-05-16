@@ -10,7 +10,7 @@ struct Cli {
     /// postgres connection string
     #[clap(
         long,
-        default_value = "postgres://postgres:password@localhost:5432/postgres"
+        default_value = "postgres://postgres:postgres@localhost:5432/usda"
     )]
     dsn: String,
 
