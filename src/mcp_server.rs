@@ -1,6 +1,12 @@
-use rmcp::{Error as McpError, ServerHandler, model::*, tool};
+use rmcp::{Error as McpError, ServerHandler, model::*, schemars, tool};
 
 use crate::db;
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct TableNameRequest {
+    #[schemars(description = "name of the table to get schema for")]
+    pub name: String,
+}
 
 #[derive(Clone)]
 pub struct McpServer {
@@ -26,6 +32,20 @@ impl McpServer {
         })?;
 
         Ok(CallToolResult::success(vec![Content::text(json)]))
+    }
+
+    #[tool(description = "Get schema of a specific table")]
+    async fn get_schema(
+        &self,
+        #[tool(aggr)] TableNameRequest { name }: TableNameRequest,
+    ) -> String {
+        match self.db.get_table_schema(&name).await {
+            Ok(schema) => match serde_json::to_string_pretty(&schema) {
+                Ok(json) => json,
+                Err(e) => format!("JSON serialization error: {}", e),
+            },
+            Err(e) => format!("Error getting schema for table {}: {}", name, e),
+        }
     }
 }
 
