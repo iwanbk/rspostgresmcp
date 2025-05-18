@@ -8,6 +8,12 @@ pub struct TableNameRequest {
     pub name: String,
 }
 
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct QueryRequest {
+    #[schemars(description = "SQL query to explain and analyze")]
+    pub query: String,
+}
+
 #[derive(Clone)]
 pub struct McpServer {
     pub db: db::DB,
@@ -45,6 +51,14 @@ impl McpServer {
                 Err(e) => format!("JSON serialization error: {}", e),
             },
             Err(e) => format!("Error getting schema for table {}: {}", name, e),
+        }
+    }
+
+    #[tool(description = "Analyze SQL query execution plan with EXPLAIN ANALYZE")]
+    async fn explain_analyze(&self, #[tool(aggr)] QueryRequest { query }: QueryRequest) -> String {
+        match self.db.explain_analyze(&query).await {
+            Ok(explain_result) => explain_result,
+            Err(e) => format!("Error analyzing query: {}", e),
         }
     }
 }

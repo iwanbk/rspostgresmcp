@@ -147,4 +147,20 @@ impl DB {
 
         Ok(TableSchema { columns, indexes })
     }
+
+    pub async fn explain_analyze(&self, query: &str) -> anyhow::Result<String> {
+        // Prepend EXPLAIN ANALYZE to the user's query
+        let explain_query = format!("EXPLAIN (FORMAT JSON, ANALYZE, BUFFERS) {}", query);
+
+        // Execute the EXPLAIN ANALYZE query
+        let result = sqlx::query(&explain_query).fetch_one(&*self.pool).await?;
+
+        // Extract the JSON result
+        let explain_output: serde_json::Value = result.get(0);
+
+        // Format the JSON for better readability
+        let formatted_output = serde_json::to_string_pretty(&explain_output)?;
+
+        Ok(formatted_output)
+    }
 }
