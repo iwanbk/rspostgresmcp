@@ -39,10 +39,45 @@ jobs:
       uses: actions-rs/clippy-check@v1
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        args: -- -D warnings
+        args: --all-features -- -D warnings
 
-    - name: Run tests
+    - name: Run unit tests
       uses: actions-rs/cargo@v1
       with:
         command: test
-        args: --verbose
+        args: --verbose --lib --bins
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    services:
+      # We don't need to define PostgreSQL here since testcontainers will handle it
+      # This job is separate to isolate Docker-based tests
+      docker:
+        image: docker:20.10-dind
+        options: --privileged
+        ports:
+          - 2375:2375
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Run integration tests
+      uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: --verbose --test integration_test
