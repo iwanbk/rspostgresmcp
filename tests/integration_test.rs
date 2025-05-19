@@ -1,5 +1,6 @@
 use anyhow::Result;
 use rspostgresmcp::{db::DB, mcp_server::McpServer};
+use sqlx::PgPool;
 use std::path::PathBuf;
 use std::time::Duration;
 use testcontainers::{Container, RunnableImage, clients, images::postgres::Postgres};
@@ -49,6 +50,38 @@ impl<'a> PostgresContainer<'a> {
             self.port
         )
     }
+
+    // Wait for PostgreSQL to be ready by attempting to connect
+    async fn wait_until_ready(&self) -> Result<()> {
+        let dsn = self.get_connection_string();
+        let max_attempts = 10;
+        let retry_delay = Duration::from_secs(1);
+
+        for attempt in 1..=max_attempts {
+            match PgPool::connect(&dsn).await {
+                Ok(_) => {
+                    println!("PostgreSQL is ready after {} attempts", attempt);
+                    return Ok(());
+                }
+                Err(e) => {
+                    if attempt == max_attempts {
+                        return Err(anyhow::anyhow!(
+                            "Failed to connect to PostgreSQL after {} attempts: {}",
+                            max_attempts,
+                            e
+                        ));
+                    }
+                    println!(
+                        "Waiting for PostgreSQL to be ready (attempt {}/{}): {}",
+                        attempt, max_attempts, e
+                    );
+                    sleep(retry_delay).await;
+                }
+            }
+        }
+
+        unreachable!()
+    }
 }
 
 #[tokio::test]
@@ -57,9 +90,9 @@ async fn test_list_tables() -> Result<()> {
     let docker = clients::Cli::default();
     let postgres = PostgresContainer::new(&docker);
 
-    // Wait for PostgreSQL to be ready and data to be loaded
-    println!("Waiting for PostgreSQL to start and load data...");
-    sleep(Duration::from_secs(10)).await;
+    // Wait for PostgreSQL to be ready by polling connection
+    postgres.wait_until_ready().await?;
+    println!("PostgreSQL is ready with Pagila data loaded");
 
     // Create DB connection using the container's port
     let dsn = postgres.get_connection_string();
